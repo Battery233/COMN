@@ -42,6 +42,7 @@ public class Sender1b {
 
             int sequence = 0;
             int resendCounter = 0;
+            int eofCounter = 0;
 
             int i, j;
             for (i = 0; i < number; i++) {
@@ -90,14 +91,22 @@ public class Sender1b {
                     } catch (SocketTimeoutException e) {
                         resend = true;
                         System.out.println("ACK time out for sequence number " + sequence);
+
+                        //resend for last command will timeout after send 5 times
+                        if (i == number - 1) {
+                            eofCounter++;
+                        }
+
+                        if (eofCounter == 10)
+                            sendSuccess = true;
                     }
                     if (resend) {
                         resendCounter++;
                         socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
                     }
                 }
-                sequence++;
                 System.out.println("Packet No." + sequence + " sent! size = " + packet.length);
+                sequence++;
                 // todo : clean old comments
                 // sleep time
 //                sleep(SLEEP_TIME);
