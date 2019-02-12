@@ -11,20 +11,22 @@ public class Sender1b {
     // define size here
     private static final int DATA_SIZE = 1024;
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
-    private static final int SLEEP_TIME = 10;
+    private static final int ACK_PACkET_SIZE = 32;   // ack size
+//    private static final int SLEEP_TIME = 10;
 
     public static void main(String[] args) {
-        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2]);
+        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2] + " Timeout: " + args[3]);
         try {
-            transport(InetAddress.getByName(args[0]), Integer.valueOf(args[1]), args[2]);
+            transport(InetAddress.getByName(args[0]), Integer.valueOf(args[1]), args[2], Integer.valueOf(args[3]));
         } catch (UnknownHostException e) {
             System.out.println("Unknown host: " + args[0]);
         }
     }
 
-    private static void transport(InetAddress RemoteHost, int Port, String Filename) {
+    private static void transport(InetAddress RemoteHost, int Port, String Filename, int timeout) {
         try {
             DatagramSocket socket = new DatagramSocket();
+            socket.setSoTimeout(timeout);
             File file = new File(Filename);
 
             // calculate the number of packets needed
@@ -39,6 +41,9 @@ public class Sender1b {
             FileInputStream fis = new FileInputStream(file);
             fis.read(fileBytes);
             fis.close();
+
+            int sequence = 0;
+            int resendCounter = 0;
 
             int i, j;
             for (i = 0; i < number; i++) {
@@ -62,14 +67,45 @@ public class Sender1b {
                 packet[0] = 0;
                 packet[1] = 0;
                 //sequence number
-                packet[2] = (byte) (i >> 8);
-                packet[3] = (byte) i;
+                packet[2] = (byte) (sequence >> 8);
+                packet[3] = (byte) sequence;
+
+                // first send the packet
                 socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
-                System.out.println("Packet No." + i + " sent! size = " + packet.length);
+                boolean sendSuccess = false;
+                boolean resend;
+                byte[] ackData = new byte[ACK_PACkET_SIZE];
+                DatagramPacket received = new DatagramPacket(ackData, ACK_PACkET_SIZE);
+                while (!sendSuccess) {
+                    resend = false;
+                    try {
+                        socket.receive(received);
+                        ackData = received.getData();
+                        int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
+                        System.out.println("***Ack number got*** " + ack);
+                        if (ack != sequence) {
+                            resend = true;
+                            System.out.println("Packet No." + sequence + " resent! resendCounter = " + resendCounter);
+                        } else {
+                            sendSuccess = true;
+                        }
+                    } catch (SocketTimeoutException e) {
+                        resend = true;
+                        System.out.println("ACK time out for sequence number " + sequence);
+                    }
+                    if (resend) {
+                        resendCounter++;
+                        socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
+                    }
+                }
+                sequence++;
+                System.out.println("Packet No." + sequence + " sent! size = " + packet.length);
+                // todo : clean old comments
                 // sleep time
-                sleep(SLEEP_TIME);
+//                sleep(SLEEP_TIME);
             }
             socket.close();
+            System.out.println("Total resent: " + resendCounter);
         } catch (Exception e) {
             e.printStackTrace();
         }
