@@ -4,14 +4,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.net.*;
 
-import static java.lang.Thread.sleep;
-
 public class Sender1b {
 
     // define size here
     private static final int DATA_SIZE = 1024;
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
-    private static final int ACK_PACkET_SIZE = 32;   // ack size
+    private static final int ACK_PACkET_SIZE = 4;   // ack size
 //    private static final int SLEEP_TIME = 10;
 
     public static void main(String[] args) {

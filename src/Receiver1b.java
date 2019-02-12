@@ -12,6 +12,7 @@ public class Receiver1b {
     // define size here
     private static final int DATA_SIZE = 1024;
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
+    private static final int ACK_PACkET_SIZE = 32;   // ack size
 
     public static void main(String[] args) {
         System.out.println("Port: " + args[0] + " Filename: " + args[1]);
@@ -58,7 +59,7 @@ public class Receiver1b {
     }
 
     private static void sendACK(DatagramSocket socket, InetAddress RemoteHost, int Port, int currentSequence) throws IOException {
-        byte[] packet = new byte[PACkET_SIZE];
+        byte[] packet = new byte[ACK_PACkET_SIZE];
         packet[0] = 0;
         packet[1] = 0;
         //sequence number
