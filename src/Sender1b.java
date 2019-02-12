@@ -13,15 +13,17 @@ public class Sender1b {
 //    private static final int SLEEP_TIME = 10;
 
     public static void main(String[] args) {
-        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2] + " Timeout: " + args[3]);
+//        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2] + " Timeout: " + args[3]);
         try {
             transport(InetAddress.getByName(args[0]), Integer.valueOf(args[1]), args[2], Integer.valueOf(args[3]));
         } catch (UnknownHostException e) {
-            System.out.println("Unknown host: " + args[0]);
+//            System.out.println("Unknown host: " + args[0]);
         }
     }
 
     private static void transport(InetAddress RemoteHost, int Port, String Filename, int timeout) {
+        int totalResend = 0;
+        int speed = 0;
         try {
             DatagramSocket socket = new DatagramSocket();
             socket.setSoTimeout(timeout);
@@ -32,7 +34,7 @@ public class Sender1b {
             if (file.length() % DATA_SIZE != 0) {
                 number++;
             }
-            System.out.println("File size: " + file.length() + " packets number: " + number);
+//            System.out.println("File size: " + file.length() + " packets number: " + number);
 
             // read file
             byte[] fileBytes = new byte[(int) file.length()];
@@ -43,6 +45,8 @@ public class Sender1b {
             int sequence = 0;
             int resendCounter = 0;
             int eofCounter = 0;
+
+            long time = System.currentTimeMillis();
 
             int i, j;
             for (i = 0; i < number; i++) {
@@ -58,6 +62,12 @@ public class Sender1b {
                     packet = new byte[(int) (file.length() % DATA_SIZE) + 5];
                     //eof flag
                     packet[4] = 1;
+
+                    //last packet, time to calculate retransmission times and speed
+                    time = System.currentTimeMillis() - time;
+                    totalResend = resendCounter;
+                    speed = (int) (((double) file.length() / 1024) / ((double) time / 1000));
+
                     for (j = 0; j < file.length() - DATA_SIZE * i; j++) {
                         packet[j + 5] = fileBytes[DATA_SIZE * i + j];
                     }
@@ -81,16 +91,16 @@ public class Sender1b {
                         socket.receive(received);
                         ackData = received.getData();
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
-                        System.out.println("***Ack number got*** " + ack);
+//                        System.out.println("***Ack number got*** " + ack);
                         if (ack != sequence) {
                             resend = true;
-                            System.out.println("Packet No." + sequence + " resent! resendCounter = " + resendCounter);
+//                            System.out.println("Packet No." + sequence + " resent! resendCounter = " + resendCounter);
                         } else {
                             sendSuccess = true;
                         }
                     } catch (SocketTimeoutException e) {
                         resend = true;
-                        System.out.println("ACK time out for sequence number " + sequence);
+//                        System.out.println("ACK time out for sequence number " + sequence);
 
                         //resend for last command will timeout after send 5 times
                         if (i == number - 1) {
@@ -105,18 +115,17 @@ public class Sender1b {
                         socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
                     }
                 }
-                System.out.println("Packet No." + sequence + " sent! size = " + packet.length);
+//                System.out.println("Packet No." + sequence + " sent! size = " + packet.length);
                 sequence++;
-                // todo : clean old comments
                 // sleep time
 //                sleep(SLEEP_TIME);
             }
             socket.close();
-            System.out.println("Total resent: " + resendCounter);
+//            System.out.println("Total resent: " + resendCounter);
         } catch (Exception e) {
-            e.printStackTrace();
+//            e.printStackTrace();
         }
-
+        System.out.print(totalResend + " " + speed);
     }
 
 }
