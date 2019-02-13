@@ -34,26 +34,27 @@ public class Receiver1b {
                 data = received.getData();
                 int length = received.getLength();  // real length of the packet size
                 int sequence = (data[2] & 0xff) << 8 | (data[3] & 0xff);    // get sequence num from bytes
-                eof = 1 == (data[4] & 0xff);    // get flag
+                eof = 1 == (data[4] & 0xff);    // get eof flag
+
                 if (currentSequence != sequence) {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence - 1);
                     if (currentSequence > sequence)
                         System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
                     else
                         System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
-                    continue;
+                    // send ACK and wait for next packet
                 } else {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
-                }
-                currentSequence++;
-                if (!eof) {
-                    writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
-                    System.out.println("Packet No." + sequence + " got! Length = " + length);
-                } else {
-                    System.out.println("Last sequence number is: " + sequence + " length = " + length);
-                    writeFile.write(data, PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
-                    socket.close();
-                    writeFile.close();
+                    currentSequence++;
+                    if (!eof) {
+                        writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
+                        System.out.println("Packet No." + sequence + " got! Length = " + length);
+                    } else {
+                        System.out.println("Last sequence number is: " + sequence + " length = " + length);
+                        writeFile.write(data, PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
+                        socket.close();
+                        writeFile.close();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -61,13 +62,13 @@ public class Receiver1b {
         }
     }
 
-    private static void sendACK(DatagramSocket socket, InetAddress RemoteHost, int Port, int currentSequence) throws IOException {
+    private static void sendACK(DatagramSocket socket, InetAddress RemoteHost, int Port, int ack) throws IOException {
         byte[] packet = new byte[ACK_PACkET_SIZE];
         packet[0] = 0;
         packet[1] = 0;
         //sequence number
-        packet[2] = (byte) (currentSequence >> 8);
-        packet[3] = (byte) currentSequence;
+        packet[2] = (byte) (ack >> 8);
+        packet[3] = (byte) ack;
         socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
     }
 }

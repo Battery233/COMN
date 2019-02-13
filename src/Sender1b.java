@@ -81,6 +81,8 @@ public class Sender1b {
 
                 // first send the packet
                 socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
+
+                //packet sent, wait for ack
                 boolean sendSuccess = false;
                 boolean resend;
                 byte[] ackData = new byte[ACK_PACkET_SIZE];
@@ -93,7 +95,7 @@ public class Sender1b {
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
 //                        System.out.println("***Ack number got*** " + ack);
                         if (ack != sequence) {
-                            // received the wrong ack, do nothoing, continue to wait for the right ack
+                            // received the wrong ack, do nothing, continue to wait for the right ack
                             continue;
                         } else {
                             sendSuccess = true;
@@ -102,13 +104,14 @@ public class Sender1b {
                         resend = true;
 //                        System.out.println("ACK time out for sequence number " + sequence);
 
-                        //resend for last command will timeout after send 5 times
+                        //resend for the last packet will timeout after 10 times
                         if (i == number - 1) {
                             eofCounter++;
                             if (eofCounter == 10)
                                 sendSuccess = true;
                         }
                     }
+
                     if (resend) {
                         resendCounter++;
                         socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
@@ -124,7 +127,7 @@ public class Sender1b {
         } catch (Exception e) {
 //            e.printStackTrace();
         }
+        // output total retransmission numbers and speed (KB/s)
         System.out.print(totalResend + " " + speed);
     }
-
 }
