@@ -66,7 +66,7 @@ public class Sender1b {
                     //last packet, time to calculate retransmission times and speed
                     time = System.currentTimeMillis() - time;
                     totalResend = resendCounter;
-                    speed = (int) (((double) file.length() / 1024) / ((double) time / 1000));
+                    speed = (int) ((file.length() / 1024.0) / (time / 1000.0));
 
                     for (j = 0; j < file.length() - DATA_SIZE * i; j++) {
                         packet[j + 5] = fileBytes[DATA_SIZE * i + j];
@@ -105,10 +105,9 @@ public class Sender1b {
                         //resend for last command will timeout after send 5 times
                         if (i == number - 1) {
                             eofCounter++;
+                            if (eofCounter == 10)
+                                sendSuccess = true;
                         }
-
-                        if (eofCounter == 10)
-                            sendSuccess = true;
                     }
                     if (resend) {
                         resendCounter++;
