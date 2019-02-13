@@ -93,8 +93,8 @@ public class Sender1b {
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
 //                        System.out.println("***Ack number got*** " + ack);
                         if (ack != sequence) {
-                            resend = true;
-//                            System.out.println("Packet No." + sequence + " resent! resendCounter = " + resendCounter);
+                            // received the wrong ack, do nothoing, continue to wait for the right ack
+                            continue;
                         } else {
                             sendSuccess = true;
                         }

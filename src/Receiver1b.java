@@ -37,7 +37,10 @@ public class Receiver1b {
                 eof = 1 == (data[4] & 0xff);    // get flag
                 if (currentSequence != sequence) {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence - 1);
-                    System.out.println("ack not match: want " + currentSequence + ", got " + sequence);
+                    if (currentSequence > sequence)
+                        System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
+                    else
+                        System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
                     continue;
                 } else {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
