@@ -12,7 +12,7 @@ public class Receiver1b {
     // define size here
     private static final int DATA_SIZE = 1024;
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
-    private static final int ACK_PACkET_SIZE = 32;   // ack size
+    private static final int ACK_PACkET_SIZE = 4;   // ack size
 
     public static void main(String[] args) {
         System.out.println("Port: " + args[0] + " Filename: " + args[1]);
