@@ -128,6 +128,6 @@ public class Sender1b {
 //            e.printStackTrace();
         }
         // output total retransmission numbers and speed (KB/s)
-        System.out.print(totalResend + " " + speed);
+        System.out.println(totalResend + " " + speed);
     }
 }
