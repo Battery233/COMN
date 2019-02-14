@@ -15,7 +15,7 @@ public class Receiver1b {
     private static final int ACK_PACkET_SIZE = 4;   // ack size
 
     public static void main(String[] args) {
-        System.out.println("Port: " + args[0] + " Filename: " + args[1]);
+//        System.out.println("Port: " + args[0] + " Filename: " + args[1]);
         receiver(Integer.parseInt(args[0]), args[1]);
     }
 
@@ -38,19 +38,19 @@ public class Receiver1b {
 
                 if (currentSequence != sequence) {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence - 1);
-                    if (currentSequence > sequence)
-                        System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
-                    else
-                        System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
+//                    if (currentSequence > sequence)
+//                        System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
+//                    else
+//                        System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
                     // send ACK and wait for next packet
                 } else {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
                     currentSequence++;
                     if (!eof) {
                         writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
-                        System.out.println("Packet No." + sequence + " got! Length = " + length);
+//                        System.out.println("Packet No." + sequence + " got! Length = " + length);
                     } else {
-                        System.out.println("Last sequence number is: " + sequence + " length = " + length);
+//                        System.out.println("Last sequence number is: " + sequence + " length = " + length);
                         writeFile.write(data, PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
                         socket.close();
                         writeFile.close();

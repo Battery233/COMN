@@ -14,11 +14,11 @@ public class Sender1a {
     private static final int SLEEP_TIME = 10;
 
     public static void main(String[] args) {
-        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2]);
+//        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2]);
         try {
             transport(InetAddress.getByName(args[0]), Integer.valueOf(args[1]), args[2]);
         } catch (UnknownHostException e) {
-            System.out.println("Unknown host: " + args[0]);
+//            System.out.println("Unknown host: " + args[0]);
         }
     }
 
@@ -32,7 +32,7 @@ public class Sender1a {
             if (file.length() % DATA_SIZE != 0) {
                 number++;
             }
-            System.out.println("File size: " + file.length() + " packets number: " + number);
+//            System.out.println("File size: " + file.length() + " packets number: " + number);
 
             // read file
             byte[] fileBytes = new byte[(int) file.length()];
@@ -65,7 +65,7 @@ public class Sender1a {
                 packet[2] = (byte) (i >> 8);
                 packet[3] = (byte) i;
                 socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
-                System.out.println("Packet No." + i + " sent! size = " + packet.length);
+//                System.out.println("Packet No." + i + " sent! size = " + packet.length);
                 // sleep time
                 sleep(SLEEP_TIME);
             }

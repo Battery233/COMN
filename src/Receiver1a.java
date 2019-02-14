@@ -12,7 +12,7 @@ public class Receiver1a {
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
 
     public static void main(String[] args) {
-        System.out.println("Port: " + args[0] + " Filename: " + args[1]);
+//        System.out.println("Port: " + args[0] + " Filename: " + args[1]);
         receiver(Integer.parseInt(args[0]), args[1]);
     }
 
@@ -33,9 +33,9 @@ public class Receiver1a {
                 eof = 1 == (data[4] & 0xff);    // get flag
                 if (!eof) {
                     writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
-                    System.out.println("Packet No." + sequence + " got! Length = " + length);
+//                    System.out.println("Packet No." + sequence + " got! Length = " + length);
                 } else {
-                    System.out.println("Last sequence number is: " + sequence + " length = " + length);
+//                    System.out.println("Last sequence number is: " + sequence + " length = " + length);
                     writeFile.write(data, PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
                     socket.close();
                     writeFile.close();
