@@ -42,21 +42,20 @@ public class Sender1b {
             fis.read(fileBytes);
             fis.close();
 
-            int sequence = 0;
             int resendCounter = 0;
             int eofCounter = 0;
 
             long time = System.currentTimeMillis();
 
-            int i, j;
-            for (i = 0; i < number; i++) {
+            int sequence, j;
+            for (sequence = 0; sequence < number; sequence++) {
                 byte[] packet;
-                if (i < number - 1) {
+                if (sequence < number - 1) {
                     packet = new byte[PACkET_SIZE];
                     // eof flag
                     packet[4] = 0;
                     for (j = 0; j < DATA_SIZE; j++) {
-                        packet[j + 5] = fileBytes[DATA_SIZE * i + j];
+                        packet[j + 5] = fileBytes[DATA_SIZE * sequence + j];
                     }
                 } else {
                     packet = new byte[(int) (file.length() % DATA_SIZE) + 5];
@@ -68,8 +67,8 @@ public class Sender1b {
                     totalResend = resendCounter;
                     speed = (int) ((file.length() / 1024.0) / (time / 1000.0));
 
-                    for (j = 0; j < file.length() - DATA_SIZE * i; j++) {
-                        packet[j + 5] = fileBytes[DATA_SIZE * i + j];
+                    for (j = 0; j < file.length() - DATA_SIZE * sequence; j++) {
+                        packet[j + 5] = fileBytes[DATA_SIZE * sequence + j];
                     }
                 }
                 // two header value
@@ -105,7 +104,7 @@ public class Sender1b {
 //                        System.out.println("ACK time out for sequence number " + sequence);
 
                         //resend for the last packet will timeout after 10 times
-                        if (i == number - 1) {
+                        if (sequence == number - 1) {
                             eofCounter++;
                             if (eofCounter == 10)
                                 sendSuccess = true;
@@ -118,7 +117,6 @@ public class Sender1b {
                     }
                 }
 //                System.out.println("Packet No." + sequence + " sent! size = " + packet.length);
-                sequence++;
                 // sleep time
 //                sleep(SLEEP_TIME);
             }
