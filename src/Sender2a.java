@@ -15,6 +15,8 @@ public class Sender2a {
     private static long number;
     private static DatagramSocket socket;
     private static int sequence = 0;
+    private static int windowSize;
+    private static int speed;
 
     public static void main(String[] args) {
 //        System.out.println("RemoteHost: " + args[0] + " Port: " + args[1] + " Filename: " + args[2] + " Timeout: " + args[3]);
@@ -25,9 +27,9 @@ public class Sender2a {
         }
     }
 
-    private static void transport(InetAddress RemoteHost, int Port, String Filename, int timeout, int windowSize) {
-        int speed = 0;
+    private static void transport(InetAddress RemoteHost, int Port, String Filename, int timeout, int size) {
         int i;
+        windowSize = size;
         try {
             socket = new DatagramSocket();
             socket.setSoTimeout(timeout);
@@ -38,15 +40,13 @@ public class Sender2a {
             if (file.length() % DATA_SIZE != 0) {
                 number++;
             }
-//            System.out.println("File size: " + file.length() + " packets number: " + number);
+            System.out.println("File size: " + file.length() + " packets number: " + number);
 
             // read file
             byte[] fileBytes = new byte[(int) file.length()];
             FileInputStream fis = new FileInputStream(file);
             fis.read(fileBytes);
             fis.close();
-
-            long time = System.currentTimeMillis();
 
             //receive the Ack
             new Thread(new Runnable() {
@@ -67,7 +67,7 @@ public class Sender2a {
                                     wrongAckCounter++;
                                     if (wrongAckCounter == 3) {
                                         wrongAckCounter = 0;
-                                        base = ack + 1;
+                                        base = ack;
                                         throw new IOException();
                                     }
                                     // received the wrong ack, do nothing, continue to wait for the right ack
@@ -76,24 +76,32 @@ public class Sender2a {
                                 }
                             }
                         } catch (IOException e) {
-                            if (e instanceof SocketTimeoutException) {
-                                if (base == number - 1) {
-                                    eofCounter++;
-                                    if (eofCounter == 10)
-                                        base++;
+                            synchronized (this) {
+                                if (e instanceof SocketTimeoutException) {
+                                    if (base <= number && base > number - windowSize) {
+                                        eofCounter++;
+                                        if (eofCounter == windowSize) {
+                                            //todo window = 1 willl not stop
+                                            // window = 256 will causes error
+                                            base = (int) number;
+                                            System.out.println("possible ack loss at the end. Quit!");
+                                        }
+                                    }
+                                    sequence = base;
+                                    System.out.println("ACK time out at packet: " + base);
+                                } else {
+                                    // this should not happen
                                 }
-                                sequence = base;
-                                System.out.println("ACK time out at packet: " + base);
-                            } else {
-                                // this should not happen
                             }
                         }
                     }
                 }
             }).start();
 
+            long timeStart = System.currentTimeMillis();
+
             while (base < number) {
-                while (sequence < base + windowSize) {
+                while (sequence < base + windowSize && sequence < number) {
                     byte[] packet;
                     if (sequence < number - 1) {
                         packet = new byte[PACkET_SIZE];
@@ -107,13 +115,10 @@ public class Sender2a {
                         //eof flag
                         packet[4] = 1;
 
-                        //last packet, time to calculate retransmission times and speed
-                        time = System.currentTimeMillis() - time;
-                        speed = (int) ((file.length() / 1024.0) / (time / 1000.0));
-
                         for (i = 0; i < file.length() - DATA_SIZE * sequence; i++) {
                             packet[i + 5] = fileBytes[DATA_SIZE * sequence + i];
                         }
+                        speed = (int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0));
                     }
                     // two header value
                     packet[0] = 0;

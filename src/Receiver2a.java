@@ -27,7 +27,8 @@ public class Receiver2a {
             int currentSequence = 0;
 
             boolean eof = false;    // flag for the last packet
-            while (!eof) {
+            boolean missing = false;
+            while (!eof || missing) {
                 byte[] data = new byte[PACkET_SIZE];
                 DatagramPacket received = new DatagramPacket(data, PACkET_SIZE);
                 socket.receive(received);
@@ -38,14 +39,17 @@ public class Receiver2a {
 
                 if (currentSequence != sequence) {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence - 1);
-                    if (currentSequence > sequence)
+                    if (currentSequence > sequence) {
                         System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
-                    else
+                    } else {
                         System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
+                    }
+                    missing = true;
 //                     send ACK and wait for next packet
                 } else {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
                     currentSequence++;
+                    missing = false;
                     if (!eof) {
                         writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
                         System.out.println("Packet No." + sequence + " got! Length = " + length);
