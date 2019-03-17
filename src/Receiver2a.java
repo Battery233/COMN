@@ -45,6 +45,7 @@ public class Receiver2a {
                         System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
                     }
                     missing = true;
+                    eof = false;
 //                     send ACK and wait for next packet
                 } else {
                     sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
