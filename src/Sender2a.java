@@ -68,7 +68,7 @@ public class Sender2a {
                             packet[i + 5] = fileBytes[DATA_SIZE * sequence + i];
                         }
                         eofCounter++;
-                        if (eofCounter == windowSize/10 + 3) {
+                        if (eofCounter == windowSize / 10 + 3) {
                             speedPrinted = true;
                             System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
                             // output total retransmission numbers and speed (KB/s)
@@ -101,11 +101,9 @@ public class Sender2a {
                         ackData = received.getData();
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
 //                        System.out.println("ACK got! " + ack + " expected ack = " + expectedAck);
-                        if (ack != expectedAck) {
+                        if (ack > = expectedAck) {
                             base = ack + 1;
-                        } else {
-                            base++;
-                            expectedAck++;
+                            expectedAck = ack + 1;
                         }
                     } catch (IOException e) {
 //                        System.out.println("ACK time out at packet: " + base);
@@ -114,7 +112,7 @@ public class Sender2a {
                 }
             }
             socket.close();
-            if(!speedPrinted)
+            if (!speedPrinted)
                 System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
         } catch (Exception ignored) {
         }
