@@ -15,8 +15,6 @@ public class Sender2a {
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
     private static final int ACK_PACkET_SIZE = 4;   // ack size
     private static int base = 0;
-    private static int sequence = 0;
-    private static int speed;
 
     public static void main(String[] args) {
         try {
@@ -39,7 +37,7 @@ public class Sender2a {
             if (file.length() % DATA_SIZE != 0) {
                 number++;
             }
-            System.out.println("File size: " + file.length() + " packets number: " + number);
+//            System.out.println("File size: " + file.length() + " packets number: " + number);
 
             // read file
             byte[] fileBytes = new byte[(int) file.length()];
@@ -52,7 +50,7 @@ public class Sender2a {
             int eofCounter = 0;
 
             while (base < (int) number) {
-                sequence = base;
+                int sequence = base;
                 while (sequence < base + windowSize && sequence < number) {
                     byte[] packet;
                     if (sequence < number - 1) {
@@ -73,8 +71,6 @@ public class Sender2a {
                         if (!speedPrinted) {
                             speedPrinted = true;
                             // output total retransmission numbers and speed (KB/s)
-                            speed = (int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0));
-                            System.out.println(speed);
                         }
                     }
                     // two header value
@@ -88,12 +84,11 @@ public class Sender2a {
                     socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
                     sequence++;
                 }
-                System.out.println("Packet sent! From base:" + base + " to sequence = " + (sequence - 1));
+//                System.out.println("Packet sent! From base:" + base + " to sequence = " + (sequence - 1));
 
-                if (eofCounter == 10)
+                if (eofCounter == (windowSize > 64 ? 32 : 10))
                     base = (int) number;
 
-                int wrongAckCounter = 0;
                 int windowEnd = base + windowSize < (int) number ? base + windowSize : (int) number;
                 expectedAck = base;
 
@@ -104,7 +99,7 @@ public class Sender2a {
                         socket.receive(received);
                         ackData = received.getData();
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
-                        System.out.println("ACK got! " + ack + " expected ack = " + expectedAck);
+//                        System.out.println("ACK got! " + ack + " expected ack = " + expectedAck);
                         if (ack != expectedAck) {
                             base = ack + 1;
                         } else {
@@ -112,14 +107,13 @@ public class Sender2a {
                             expectedAck++;
                         }
                     } catch (IOException e) {
-                        System.out.println("ACK time out at packet: " + base);
+//                        System.out.println("ACK time out at packet: " + base);
                         break;
                     }
                 }
             }
-
             socket.close();
-
+            System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
         } catch (Exception ignored) {
         }
     }
