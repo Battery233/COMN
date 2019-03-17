@@ -101,7 +101,7 @@ public class Sender2a {
                         ackData = received.getData();
                         int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
 //                        System.out.println("ACK got! " + ack + " expected ack = " + expectedAck);
-                        if (ack > = expectedAck) {
+                        if (ack >= expectedAck) {
                             base = ack + 1;
                             expectedAck = ack + 1;
                         }
