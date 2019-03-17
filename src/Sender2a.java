@@ -68,8 +68,9 @@ public class Sender2a {
                             packet[i + 5] = fileBytes[DATA_SIZE * sequence + i];
                         }
                         eofCounter++;
-                        if (!speedPrinted) {
+                        if (eofCounter == windowSize/10 + 3) {
                             speedPrinted = true;
+                            System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
                             // output total retransmission numbers and speed (KB/s)
                         }
                     }
@@ -113,7 +114,8 @@ public class Sender2a {
                 }
             }
             socket.close();
-            System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
+            if(!speedPrinted)
+                System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
         } catch (Exception ignored) {
         }
     }
