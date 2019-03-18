@@ -8,7 +8,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-public class Sender2a {
+public class Sender2b {
 
     // define size here
     private static final int DATA_SIZE = 1024;
