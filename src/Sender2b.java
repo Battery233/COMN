@@ -3,10 +3,16 @@
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Sender2b {
 
@@ -15,6 +21,15 @@ public class Sender2b {
     private static final int PACkET_SIZE = DATA_SIZE + 5;   // head size = 5
     private static final int ACK_PACkET_SIZE = 4;   // ack size
     private static int base = 0;
+    private static long number;
+    private static long fileLength;
+    private static int acked = 0;
+    private static DatagramChannel channel;
+    private static byte[] fileBytes;
+    private static SocketAddress sa;
+    private static HashMap<Integer, Boolean> map;
+    private static int timeout;
+    private static int windowSize;
 
     public static void main(String[] args) {
         try {
@@ -23,98 +38,127 @@ public class Sender2b {
         }
     }
 
-    private static void transport(InetAddress RemoteHost, int Port, String Filename, int timeout, int windowSize) {
-        int i;
+    private static void transport(InetAddress RemoteHost, int Port, String Filename, int arg3, int arg4) {
         boolean speedPrinted = false;
+        Sender2b.timeout = arg3;
+        Sender2b.windowSize = arg4;
 
         try {
-            DatagramSocket socket = new DatagramSocket();
-            socket.setSoTimeout(timeout);
             File file = new File(Filename);
 
             // calculate the number of packets needed
-            long number = file.length() / DATA_SIZE;
+            number = file.length() / DATA_SIZE;
             if (file.length() % DATA_SIZE != 0) {
                 number++;
             }
 //            System.out.println("File size: " + file.length() + " packets number: " + number);
 
             // read file
-            byte[] fileBytes = new byte[(int) file.length()];
+            fileLength = (int) file.length();
+            fileBytes = new byte[(int) fileLength];
             FileInputStream fis = new FileInputStream(file);
             fis.read(fileBytes);
             fis.close();
 
             long timeStart = System.currentTimeMillis();
-            int expectedAck;
-            int eofCounter = 0;
+            channel = DatagramChannel.open();
+            sa = new InetSocketAddress(RemoteHost, Port);
+            channel.socket().bind(sa);
+            int sequence;
+            map = new HashMap<Integer, Boolean>();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (this) {
+                        while (acked != number) {
+                            ByteBuffer data = ByteBuffer.allocate(ACK_PACkET_SIZE * windowSize);
+                            try {
+                                channel.read(data);
+                                System.out.println(data);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            byte[] ackData = data.array();
+                            for (int i = 0; i < (ackData.length) / ACK_PACkET_SIZE; i++) {
+                                int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
+                                map.remove(ack);
+                                map.put(ack, true);
+                                acked++;
+                            }
+                            //todo last ack lost
+                        }
+                    }
+                }
+            }).start();
 
             while (base < (int) number) {
-                int sequence = base;
-                while (sequence < base + windowSize && sequence < number) {
-                    byte[] packet;
-                    if (sequence < number - 1) {
-                        packet = new byte[PACkET_SIZE];
-                        // eof flag
-                        packet[4] = 0;
-                        for (i = 0; i < DATA_SIZE; i++) {
-                            packet[i + 5] = fileBytes[DATA_SIZE * sequence + i];
+                sequence = base;
+                while (sequence < base + windowSize) {
+                    synchronized (Sender2b.class) {
+                        if (!map.containsKey(sequence)) {
+                            map.put(sequence, false);
+                            sendData(sequence);
+                            System.out.println("Send data " + sequence);
                         }
-                    } else {
-                        packet = new byte[(int) (file.length() % DATA_SIZE) + 5];
-                        //eof flag
-                        packet[4] = 1;
-                        for (i = 0; i < file.length() - DATA_SIZE * sequence; i++) {
-                            packet[i + 5] = fileBytes[DATA_SIZE * sequence + i];
-                        }
-                        eofCounter++;
-                        if (eofCounter == windowSize / 10 + 3) {
-                            speedPrinted = true;
-                            System.out.println((int) ((file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
-                            // output total retransmission numbers and speed (KB/s)
-                        }
+                        sequence++;
                     }
-                    // two header value
-                    packet[0] = 0;
-                    packet[1] = 0;
-                    //sequence number
-                    packet[2] = (byte) (sequence >> 8);
-                    packet[3] = (byte) sequence;
-
-                    // first send the packet
-                    socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
-                    sequence++;
                 }
-//                System.out.println("Packet sent! From base:" + base + " to sequence = " + (sequence - 1));
-
-                if (eofCounter == (windowSize > 64 ? 32 : 10))
-                    base = (int) number;
-
-                int windowEnd = base + windowSize < (int) number ? base + windowSize : (int) number;
-                expectedAck = base;
-
-                while (expectedAck < windowEnd) {
-                    byte[] ackData = new byte[ACK_PACkET_SIZE];
-                    DatagramPacket received = new DatagramPacket(ackData, ACK_PACkET_SIZE);
-                    try {
-                        socket.receive(received);
-                        ackData = received.getData();
-                        int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
-//                        System.out.println("ACK got! " + ack + " expected ack = " + expectedAck);
-                        if (ack >= expectedAck) {
-                            base = ack + 1;
-                            expectedAck = ack + 1;
-                        }
-                    } catch (IOException e) {
-//                        System.out.println("ACK time out at packet: " + base);
-                        break;
-                    }
+                while (map.get(base)) {
+                    base++;
+                    System.out.println("Base moved to " + base);
                 }
             }
-            socket.close();
+
+            channel.close();
             if (!speedPrinted)
                 System.out.println(String.format("%.2f", (file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
         } catch (Exception ignored) {
         }
+    }
+
+    private static void sendData(int sequence) throws IOException {
+        byte[] packet;
+        int i;
+        final int sendDataSequence = sequence;
+        if (sendDataSequence < number - 1) {
+            packet = new byte[PACkET_SIZE];
+            // eof flag
+            packet[4] = 0;
+            for (i = 0; i < DATA_SIZE; i++) {
+                packet[i + 5] = fileBytes[DATA_SIZE * sendDataSequence + i];
+            }
+        } else {
+            packet = new byte[(int) (fileLength % DATA_SIZE) + 5];
+            //eof flag
+            packet[4] = 1;
+            for (i = 0; i < fileLength - DATA_SIZE * sendDataSequence; i++) {
+                packet[i + 5] = fileBytes[DATA_SIZE * sendDataSequence + i];
+            }
+            packet[0] = 0;
+            packet[1] = 0;
+            //sequence number
+            packet[2] = (byte) (sendDataSequence >> 8);
+            packet[3] = (byte) sendDataSequence;
+        }
+        channel.send(ByteBuffer.wrap(packet), sa);
+
+        ScheduledExecutorService scheduler
+                = Executors.newSingleThreadScheduledExecutor();
+        Runnable task = new Runnable() {
+            public void run() {
+                if (!map.get(sendDataSequence)) {
+                    try {
+                        sendData(sendDataSequence);
+//                        System.out.println("Packet " + sendDataSequence + " Time out! resend!");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+
+        scheduler.schedule(task, timeout, TimeUnit.MILLISECONDS);
+        scheduler.shutdown();
     }
 }

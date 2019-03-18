@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.HashMap;
 
 public class Receiver2b {
 
@@ -15,8 +16,7 @@ public class Receiver2b {
     private static final int ACK_PACkET_SIZE = 4;   // ack size
 
     public static void main(String[] args) {
-//        System.out.println("Port: " + args[0] + " Filename: " + args[1]);
-        receiver(Integer.parseInt(args[0]), args[1], Integer.parseInt(args[3]));
+        receiver(Integer.parseInt(args[0]), args[1], Integer.parseInt(args[2]));
     }
 
     private static void receiver(int Port, String fileName, int windowSize) {
@@ -24,10 +24,12 @@ public class Receiver2b {
             // get tools ready
             DatagramSocket socket = new DatagramSocket(Port);
             FileOutputStream writeFile = new FileOutputStream(new File(fileName));
-            int currentSequence = 0;
+            int lastSequence = 2147483647;
+            int base = 0;
+            HashMap<Integer, byte[]> map = new HashMap<Integer, byte[]>();
+            boolean eof;    // flag for the last packet
 
-            boolean eof = false;    // flag for the last packet
-            while (!eof) {
+            while (base < lastSequence) {
                 byte[] data = new byte[PACkET_SIZE];
                 DatagramPacket received = new DatagramPacket(data, PACkET_SIZE);
                 socket.receive(received);
@@ -35,32 +37,36 @@ public class Receiver2b {
                 int length = received.getLength();  // real length of the packet size
                 int sequence = (data[2] & 0xff) << 8 | (data[3] & 0xff);    // get sequence num from bytes
                 eof = 1 == (data[4] & 0xff);    // get eof flag
+                System.out.println("Get packet: " + sequence + " length = " + length);
 
-                if (currentSequence != sequence) {
-                    sendACK(socket, received.getAddress(), received.getPort(), currentSequence - 1);
-//                    if (currentSequence > sequence) {
-//                        System.out.println("Duplicate packet: want: " + currentSequence + ", got " + sequence);
-//                    } else {
-//                        System.out.println("Missing packet: want: " + currentSequence + ", got " + sequence);
-//                    }
-                    eof = false;
-//                     send ACK and wait for next packet
-                } else {
-                    sendACK(socket, received.getAddress(), received.getPort(), currentSequence);
-                    currentSequence++;
-                    if (!eof) {
-                        writeFile.write(data, PACkET_SIZE - DATA_SIZE, DATA_SIZE);
-//                        System.out.println("Packet No." + sequence + " got! Length = " + length);
-                    } else {
-//                        System.out.println("Last sequence number is: " + sequence + " length = " + length);
-                        writeFile.write(data, PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
-                        socket.close();
-                        writeFile.close();
+                if (eof) {
+                    lastSequence = sequence;
+                }
+
+                if (sequence >= base && sequence < base + windowSize) {
+                    sendACK(socket, received.getAddress(), received.getPort(), sequence);
+                    System.out.println("Sent ack " + sequence);
+                    if (!map.containsKey(sequence))
+                        map.put(sequence, data);
+                    if (sequence == base) {
+                        while (map.containsKey(base)) {
+                            if (base != lastSequence) {
+                                writeFile.write(map.get(base), PACkET_SIZE - DATA_SIZE, DATA_SIZE);
+                                map.remove(base);
+                                System.out.println("Packet No." + base + " written!");
+                            } else {
+                                System.out.println("Last sequence number is: " + sequence + " length = " + length);
+                                writeFile.write(map.get(base), PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
+                                socket.close();
+                                writeFile.close();
+                                break;
+                            }
+                            base++;
+                        }
                     }
                 }
             }
-        } catch (Exception e) {
-//            e.printStackTrace();
+        } catch (Exception ignored) {
         }
     }
 
