@@ -28,8 +28,9 @@ public class Receiver2b {
             int base = 0;
             HashMap<Integer, byte[]> map = new HashMap<Integer, byte[]>();
             boolean eof;    // flag for the last packet
+            boolean fileSaved = false;
 
-            while (base < lastSequence) {
+            while (base < lastSequence && !fileSaved) {
                 byte[] data = new byte[PACkET_SIZE];
                 DatagramPacket received = new DatagramPacket(data, PACkET_SIZE);
                 socket.receive(received);
@@ -37,15 +38,14 @@ public class Receiver2b {
                 int length = received.getLength();  // real length of the packet size
                 int sequence = (data[2] & 0xff) << 8 | (data[3] & 0xff);    // get sequence num from bytes
                 eof = 1 == (data[4] & 0xff);    // get eof flag
-                System.out.println("Get packet: " + sequence + " length = " + length);
-
+                System.out.println("Get packet: " + sequence + " length = " + length + " current base = " + base);
+                sendACK(socket, received.getAddress(), received.getPort(), sequence);
+                System.out.println("Sent ack " + sequence);
                 if (eof) {
                     lastSequence = sequence;
                 }
 
                 if (sequence >= base && sequence < base + windowSize) {
-                    sendACK(socket, received.getAddress(), received.getPort(), sequence);
-                    System.out.println("Sent ack " + sequence);
                     if (!map.containsKey(sequence))
                         map.put(sequence, data);
                     if (sequence == base) {
@@ -57,8 +57,8 @@ public class Receiver2b {
                             } else {
                                 System.out.println("Last sequence number is: " + sequence + " length = " + length);
                                 writeFile.write(map.get(base), PACkET_SIZE - DATA_SIZE, length - (PACkET_SIZE - DATA_SIZE));
-                                socket.close();
                                 writeFile.close();
+                                fileSaved = true;
                                 break;
                             }
                             base++;
@@ -66,6 +66,21 @@ public class Receiver2b {
                     }
                 }
             }
+            socket.setSoTimeout(1000);
+            while (true) {
+                try {
+                    byte[] data = new byte[PACkET_SIZE];
+                    DatagramPacket received = new DatagramPacket(data, PACkET_SIZE);
+                    socket.receive(received);
+                    data = received.getData();
+                    int length = received.getLength();  // real length of the packet size
+                    int sequence = (data[2] & 0xff) << 8 | (data[3] & 0xff);
+                    sendACK(socket, received.getAddress(), received.getPort(), sequence);
+                } catch (Exception e) {
+                    break;
+                }
+            }
+            socket.close();
         } catch (Exception ignored) {
         }
     }

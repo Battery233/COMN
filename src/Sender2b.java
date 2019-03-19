@@ -3,12 +3,10 @@
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.channels.DatagramChannel;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,12 +21,12 @@ public class Sender2b {
     private static int base = 0;
     private static long number;
     private static long fileLength;
-    private static int acked = 0;
-    private static DatagramChannel channel;
+    private static DatagramSocket socket;
     private static byte[] fileBytes;
-    private static SocketAddress sa;
     private static HashMap<Integer, Boolean> map;
     private static int timeout;
+    private static InetAddress RemoteHost;
+    private static int Port;
     private static int windowSize;
 
     public static void main(String[] args) {
@@ -38,8 +36,10 @@ public class Sender2b {
         }
     }
 
-    private static void transport(InetAddress RemoteHost, int Port, String Filename, int arg3, int arg4) {
+    private static void transport(InetAddress arg1, int arg2, String Filename, int arg3, int arg4) {
         boolean speedPrinted = false;
+        Sender2b.RemoteHost = arg1;
+        Sender2b.Port = arg2;
         Sender2b.timeout = arg3;
         Sender2b.windowSize = arg4;
 
@@ -61,30 +61,28 @@ public class Sender2b {
             fis.close();
 
             long timeStart = System.currentTimeMillis();
-            channel = DatagramChannel.open();
-            sa = new InetSocketAddress(RemoteHost, Port);
-            channel.socket().bind(sa);
             int sequence;
             map = new HashMap<Integer, Boolean>();
+            socket = new DatagramSocket();
 
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     synchronized (this) {
-                        while (acked != number) {
-                            ByteBuffer data = ByteBuffer.allocate(ACK_PACkET_SIZE * windowSize);
+                        while (base != number) {
+                            byte[] ackData = new byte[ACK_PACkET_SIZE];
+                            DatagramPacket received = new DatagramPacket(ackData, ACK_PACkET_SIZE);
                             try {
-                                channel.read(data);
-                                System.out.println(data);
+                                socket.receive(received);
+                                ackData = received.getData();
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
-                            byte[] ackData = data.array();
                             for (int i = 0; i < (ackData.length) / ACK_PACkET_SIZE; i++) {
                                 int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
                                 map.remove(ack);
                                 map.put(ack, true);
-                                acked++;
+                                System.out.println("Get ack " + ack);
                             }
                             //todo last ack lost
                         }
@@ -93,9 +91,9 @@ public class Sender2b {
             }).start();
 
             while (base < (int) number) {
-                sequence = base;
-                while (sequence < base + windowSize) {
-                    synchronized (Sender2b.class) {
+                synchronized (Sender2b.class) {
+                    sequence = base;
+                    while (sequence < base + windowSize) {
                         if (!map.containsKey(sequence)) {
                             map.put(sequence, false);
                             sendData(sequence);
@@ -103,17 +101,22 @@ public class Sender2b {
                         }
                         sequence++;
                     }
-                }
-                while (map.get(base)) {
-                    base++;
-                    System.out.println("Base moved to " + base);
+
+                    while (map.get(base)) {
+                        if(base< sequence -1)
+                            base++;
+                        else
+                            break;
+                        System.out.println("Base moved to " + base);
+                    }
                 }
             }
-
-            channel.close();
+            // todo sockect close problem
+            socket.close();
             if (!speedPrinted)
                 System.out.println(String.format("%.2f", (file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -135,13 +138,14 @@ public class Sender2b {
             for (i = 0; i < fileLength - DATA_SIZE * sendDataSequence; i++) {
                 packet[i + 5] = fileBytes[DATA_SIZE * sendDataSequence + i];
             }
-            packet[0] = 0;
-            packet[1] = 0;
-            //sequence number
-            packet[2] = (byte) (sendDataSequence >> 8);
-            packet[3] = (byte) sendDataSequence;
         }
-        channel.send(ByteBuffer.wrap(packet), sa);
+        packet[0] = 0;
+        packet[1] = 0;
+        //sequence number
+        packet[2] = (byte) (sendDataSequence >> 8);
+        packet[3] = (byte) sendDataSequence;
+        System.out.println("inside packet sequence " + packet[2] + " " + packet[3]);
+        socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
 
         ScheduledExecutorService scheduler
                 = Executors.newSingleThreadScheduledExecutor();
@@ -150,7 +154,7 @@ public class Sender2b {
                 if (!map.get(sendDataSequence)) {
                     try {
                         sendData(sendDataSequence);
-//                        System.out.println("Packet " + sendDataSequence + " Time out! resend!");
+                        System.out.println("Packet " + sendDataSequence + " Time out! resend!");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
