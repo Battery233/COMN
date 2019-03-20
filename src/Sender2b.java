@@ -37,7 +37,6 @@ public class Sender2b {
     }
 
     private static void transport(InetAddress arg1, int arg2, String Filename, int arg3, int arg4) {
-        boolean speedPrinted = false;
         Sender2b.RemoteHost = arg1;
         Sender2b.Port = arg2;
         Sender2b.timeout = arg3;
@@ -76,15 +75,14 @@ public class Sender2b {
                                 socket.receive(received);
                                 ackData = received.getData();
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                // potential socket closed exception when all the ack is received
+//                                stop the process when socket is closed
+                                break;
                             }
-                            for (int i = 0; i < (ackData.length) / ACK_PACkET_SIZE; i++) {
-                                int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
-                                map.remove(ack);
-                                map.put(ack, true);
-                                System.out.println("Get ack " + ack);
-                            }
-                            //todo last ack lost
+                            int ack = (ackData[2] & 0xff) << 8 | (ackData[3] & 0xff);
+                            map.remove(ack);
+                            map.put(ack, true);
+//                            System.out.println("Get ack " + ack);
                         }
                     }
                 }
@@ -92,31 +90,35 @@ public class Sender2b {
 
             while (base < (int) number) {
                 synchronized (Sender2b.class) {
+//                    System.out.println(base + " ---- " + number);
                     sequence = base;
-                    while (sequence < base + windowSize) {
+                    while (sequence < base + windowSize && sequence < number) {
                         if (!map.containsKey(sequence)) {
                             map.put(sequence, false);
                             sendData(sequence);
-                            System.out.println("Send data " + sequence);
+                            if (sequence == number - 1)
+                                System.out.println(String.format("%.2f", (file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
+//                           System.out.println("Send data " + sequence);
                         }
                         sequence++;
                     }
-
-                    while (map.get(base)) {
-                        if(base< sequence -1)
-                            base++;
-                        else
-                            break;
-                        System.out.println("Base moved to " + base);
+                    try {
+                        while (map.get(base)) {
+                            if (base < sequence)
+                                base++;
+                            else
+                                break;
+//                            System.out.println("Base moved to " + base);
+                        }
+                    } catch (NullPointerException ignored) {
+                        // when base has not been sent, null exception will be thrown
+                        //can safely ignore this
                     }
                 }
             }
-            // todo sockect close problem
             socket.close();
-            if (!speedPrinted)
-                System.out.println(String.format("%.2f", (file.length() / 1024.0) / ((System.currentTimeMillis() - timeStart) / 1000.0)));
         } catch (Exception e) {
-            e.printStackTrace();
+//            e.printStackTrace();
         }
     }
 
@@ -144,7 +146,7 @@ public class Sender2b {
         //sequence number
         packet[2] = (byte) (sendDataSequence >> 8);
         packet[3] = (byte) sendDataSequence;
-        System.out.println("inside packet sequence " + packet[2] + " " + packet[3]);
+//        System.out.println("inside packet sequence " + packet[2] + " " + packet[3]);
         socket.send(new DatagramPacket(packet, packet.length, RemoteHost, Port));
 
         ScheduledExecutorService scheduler
@@ -154,9 +156,9 @@ public class Sender2b {
                 if (!map.get(sendDataSequence)) {
                     try {
                         sendData(sendDataSequence);
-                        System.out.println("Packet " + sendDataSequence + " Time out! resend!");
+//                        System.out.println("Packet " + sendDataSequence + " Time out! resend!");
                     } catch (IOException e) {
-                        e.printStackTrace();
+//                        e.printStackTrace();
                     }
                 }
             }
